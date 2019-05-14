@@ -94,7 +94,9 @@ void toggleLight(byte lightNum, byte transitiontime) {
 
 
 
-
+/*  setup
+ *  Initialie button pins and serial communication and connect to WiFi
+ */
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, password);
@@ -102,21 +104,22 @@ void setup() {
     if (pin == 15 or pin == 16) pinMode(pin, INPUT);
     else pinMode(pin, INPUT_PULLUP);
   }
-  //  dbprint("Connecting to WiFi");
-  //  while (WiFi.status() != WL_CONNECTED) {
-  //    delay(1000);
-  //    dbprint(".");
-  //  }
-  //  dbprintln("Connected to the WiFi network");
+  if (!TEXT_TESTING_MODE) {
+    dbprint("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(1000);
+      dbprint(".");
+    }
+    dbprintln("Connected to the WiFi network");
+  }
   buttonLastPressTime = 0;
 }
 
 
-
+/*  loop
+ *  check buttons and run tic tac toe game
+ */
 void loop() {
-
-
-
   currentTime = millis(); //Update time (for debouncing)
 
 
@@ -126,7 +129,7 @@ void loop() {
     resetGame();
   }
 
-  buttonTrigger(); //Check buttons and trigger actions
+  checkButtons(); //Check buttons and trigger actions
 
   if (currentTime - lightLastUpdate > 1000) { //Update lights once per second
     if (TEXT_TESTING_MODE) {
@@ -141,7 +144,7 @@ void loop() {
   //Check if a player has won
   //Planning to implement: if player wins, whole screen goes to their color
   //for 5(?) seconds before resetting
-  checkForVictory(); 
+  checkForVictory();
 
 
   //If every space is claimed and no one won (locked up) reset game
@@ -149,7 +152,12 @@ void loop() {
 }
 
 
-void buttonTrigger() {
+/* checkButtons
+   checks all of the buttons to see if they have been pressed
+   If one has and anti-debouncing measures are satisfied, 
+   the corresponding light is switched if it a valid move
+*/
+void checkButtons() {
   for (int i = 0; i < 9; i++) {
     int reading = digitalRead(buttonPins[i]);
     if (buttonPins[i] == 15 or buttonPins[i] == 16) reading = !reading; //Invert reading for pins using external resistor
@@ -163,12 +171,12 @@ void buttonTrigger() {
     }
 
     //If it is pushed,
-    if (reading == LOW and buttonToggles[i] == 0 and currentTime - buttonLastPressTime > 400) { //400ms pause, using buttonToggles for debouncing
+    //500ms pause, using buttonToggles for debouncing
+    if (reading == LOW and buttonToggles[i] == 0 and currentTime - buttonLastPressTime > 500) { 
       dbprintln("Button " + String(i) + " pressed.");
       ttcManager(lightIndexes[i]);
-      //toggleLight(lightIndexes[i], 2); //Toggle light state with 0.2s transitiontime
-      buttonToggles[i] = 1;
-      buttonLastPressTime = currentTime;
+      buttonToggles[i] = 1; //set buttonToggle to 1 so that we know that this button isn't being held down
+      buttonLastPressTime = currentTime; //Stop player from accidentally taking next players turn by hitting 2 buttons fast
     }
   }
 }
@@ -250,22 +258,22 @@ void checkForVictory() {
       if (owner == 2) greenPlayerCount++;
     }
     if (bluePlayerCount == 3) {
-      
+
       if (TEXT_TESTING_MODE) {
         dbprintln("BLUE (1) WIN");
         delay(5000);
       }
-      
+
       resetGame();
       //blue player WIN
     }
     if (greenPlayerCount == 3) {
-      
+
       if (TEXT_TESTING_MODE) {
         dbprintln("GREEN (2) WIN");
         delay(5000);
       }
-      
+
       resetGame();
       //green player WIN
     }
@@ -279,10 +287,10 @@ void checkForVictory() {
 */
 void checkForFullBoard() {
   bool anySpacesLeft = false;
-  for(int positionStatus : tictactoeStates) {
-    if(positionStatus == 0) anySpacesLeft = true;
+  for (int positionStatus : tictactoeStates) {
+    if (positionStatus == 0) anySpacesLeft = true;
   }
-  if(!anySpacesLeft) {
+  if (!anySpacesLeft) {
     dbprintln("Game locked up - resetting");
     resetGame();
   }
@@ -300,12 +308,20 @@ int ownsLight(int lightNum) {
   }
 }
 
+/* lightNumToIndex
+ * Convert the number of a light in the Philips Hue system
+ * to it's index in the tic tac toe game (0-8)
+ */
 int lightNumToIndex(int lightNum) {
   for (int i = 0; i < 9; i++) {
     if (lightIndexes[i] == lightNum) return i;
   }
 }
 
+
+/* resetGame
+ * reset the variables that drive the tic tac toe game to restart
+ */
 void resetGame() {
   playerTakingTurn = 1;
   for (int i = 0; i < 9; i++) {
@@ -313,6 +329,11 @@ void resetGame() {
   }
 }
 
+/* printGameState
+ * Print the states of the 9 "lights" in a 3x3 grid
+ * to play tic tac toe in the serial monitor
+ * Displays which player's turn it is 
+ */
 void printGameState() {
   Serial.println("Player's Turn: " + String(playerTakingTurn));
   Serial.println("Game Status:");

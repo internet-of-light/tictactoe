@@ -12,7 +12,7 @@
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
 
-#define TEXT_TESTING_MODE true //Disable lights and wifi, play tic tac toe in serial monitor
+#define TEXT_TESTING_MODE false //Disable lights and wifi, play tic tac toe in serial monitor
 #define DEBUG true //View button presses and Hue API calls in serial monitor
 
 // Wifi network SSID
@@ -95,8 +95,8 @@ void toggleLight(byte lightNum, byte transitiontime) {
 
 
 /*  setup
- *  Initialie button pins and serial communication and connect to WiFi
- */
+    Initialie button pins and serial communication and connect to WiFi
+*/
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, password);
@@ -113,12 +113,13 @@ void setup() {
     dbprintln("Connected to the WiFi network");
   }
   buttonLastPressTime = 0;
+  drawLights();
 }
 
 
 /*  loop
- *  check buttons and run tic tac toe game
- */
+    check buttons and run tic tac toe game
+*/
 void loop() {
   currentTime = millis(); //Update time (for debouncing)
 
@@ -131,11 +132,11 @@ void loop() {
 
   checkButtons(); //Check buttons and trigger actions
 
-  if (currentTime - lightLastUpdate > 1000) { //Update lights once per second
+  if (currentTime - lightLastUpdate > 2000) { //Update lights once per second
     if (TEXT_TESTING_MODE) {
       printGameState(); //Instead of pushing to lights, view game status in serial monitor
     } else {
-      drawLights(); //push game information to Philips Hue lights
+      //drawLights(); //push game information to Philips Hue lights
     }
     lightLastUpdate = currentTime;
   }
@@ -154,7 +155,7 @@ void loop() {
 
 /* checkButtons
    checks all of the buttons to see if they have been pressed
-   If one has and anti-debouncing measures are satisfied, 
+   If one has and anti-debouncing measures are satisfied,
    the corresponding light is switched if it a valid move
 */
 void checkButtons() {
@@ -172,9 +173,10 @@ void checkButtons() {
 
     //If it is pushed,
     //500ms pause, using buttonToggles for debouncing
-    if (reading == LOW and buttonToggles[i] == 0 and currentTime - buttonLastPressTime > 500) { 
+    if (reading == LOW and buttonToggles[i] == 0 and currentTime - buttonLastPressTime > 500) {
       dbprintln("Button " + String(i) + " pressed.");
       ttcManager(lightIndexes[i]);
+      drawLights();
       buttonToggles[i] = 1; //set buttonToggle to 1 so that we know that this button isn't being held down
       buttonLastPressTime = currentTime; //Stop player from accidentally taking next players turn by hitting 2 buttons fast
     }
@@ -258,22 +260,16 @@ void checkForVictory() {
       if (owner == 2) greenPlayerCount++;
     }
     if (bluePlayerCount == 3) {
-
-      if (TEXT_TESTING_MODE) {
-        dbprintln("BLUE (1) WIN");
-        delay(5000);
-      }
-
+      changeGroup(1, 2, "on", "true", "bri", "254", "hue", "44000", "sat", "200");
+      dbprintln("BLUE (1) WIN");
+      delay(5000);
       resetGame();
       //blue player WIN
     }
     if (greenPlayerCount == 3) {
-
-      if (TEXT_TESTING_MODE) {
-        dbprintln("GREEN (2) WIN");
-        delay(5000);
-      }
-
+      dbprintln("GREEN (2) WIN");
+      changeGroup(1, 2, "on", "true", "bri", "254", "hue", "24000", "sat", "200");
+      delay(5000);
       resetGame();
       //green player WIN
     }
@@ -292,6 +288,7 @@ void checkForFullBoard() {
   }
   if (!anySpacesLeft) {
     dbprintln("Game locked up - resetting");
+    delay(2500);
     resetGame();
   }
 }
@@ -309,9 +306,9 @@ int ownsLight(int lightNum) {
 }
 
 /* lightNumToIndex
- * Convert the number of a light in the Philips Hue system
- * to it's index in the tic tac toe game (0-8)
- */
+   Convert the number of a light in the Philips Hue system
+   to it's index in the tic tac toe game (0-8)
+*/
 int lightNumToIndex(int lightNum) {
   for (int i = 0; i < 9; i++) {
     if (lightIndexes[i] == lightNum) return i;
@@ -320,20 +317,21 @@ int lightNumToIndex(int lightNum) {
 
 
 /* resetGame
- * reset the variables that drive the tic tac toe game to restart
- */
+   reset the variables that drive the tic tac toe game to restart
+*/
 void resetGame() {
   playerTakingTurn = 1;
   for (int i = 0; i < 9; i++) {
     tictactoeStates[i] = 0;
   }
+  changeGroup(1, 2, "on", "true", "bri", "100", "hue", "9000", "sat", "100");
 }
 
 /* printGameState
- * Print the states of the 9 "lights" in a 3x3 grid
- * to play tic tac toe in the serial monitor
- * Displays which player's turn it is 
- */
+   Print the states of the 9 "lights" in a 3x3 grid
+   to play tic tac toe in the serial monitor
+   Displays which player's turn it is
+*/
 void printGameState() {
   Serial.println("Player's Turn: " + String(playerTakingTurn));
   Serial.println("Game Status:");

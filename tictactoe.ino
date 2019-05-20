@@ -175,7 +175,7 @@ void checkButtons() {
     //500ms pause, using buttonToggles for debouncing
     if (reading == LOW and buttonToggles[i] == 0 and currentTime - buttonLastPressTime > 500) {
       dbprintln("Button " + String(i) + " pressed.");
-      ttcManager(lightIndexes[i]);
+      tttManager(lightIndexes[i]);
       drawLights();
       buttonToggles[i] = 1; //set buttonToggle to 1 so that we know that this button isn't being held down
       buttonLastPressTime = currentTime; //Stop player from accidentally taking next players turn by hitting 2 buttons fast
@@ -187,12 +187,12 @@ void checkButtons() {
 
 
 
-/* ttc (tic tac toe) Manager
+/* ttt (tic tac toe) Manager
    Called when a button is pressed
    Updates the state of the corresponding
    light if it was a valid move
 */
-void ttcManager(int lightNum) {
+void tttManager(int lightNum) {
   int lightOwner = ownsLight(lightNum);
   int lightIndex = lightNumToIndex(lightNum);
   if (playerTakingTurn == 1) { //If player 1 pressed the button

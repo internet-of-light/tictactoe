@@ -123,8 +123,14 @@ void setup() {
 void loop() {
   currentTime = millis(); //Update time (for debouncing)
 
-
-  if (currentTime - buttonLastPressTime > 30000) {
+  unsigned long timeSinceLastInput = currentTime - buttonLastPressTime;
+  //Warning after 15 seconds
+  if (timeSinceLastInput > 15000 and timeSinceLastInput < 15100) {
+    dbprintln("15 seconds since last input");
+  }
+  
+  //Reset after 30 seconds of no input
+  if (timeSinceLastInput > 30000) {
     dbprintln("Timeout - resetting game");
     buttonLastPressTime = currentTime;
     resetGame();

@@ -11,24 +11,32 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <ArduinoJson.h>
+#include <PubSubClient.h> //mqtt
 
 #define TEXT_TESTING_MODE false //Disable lights and wifi, play tic tac toe in serial monitor
 #define DEBUG true //View button presses and Hue API calls in serial monitor
 
-// Wifi network SSID
-const char* ssid = "University of Washington";
-// Wifi network password
-const char* password = "";
-
-// IP of Hue gateway
-String ip = "172.28.219.179";
-String api_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB";
+//MQTT
+const char* mqtt_server = "broker.mqttdashboard.com";
+const char* mqtt_username = "";
+const char* mqtt_password = "";
+const int mqtt_port = 1883;
+#define DEVICE_MQTT_NAME "tictactoe"
 
 
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+const char* ssid = "University of Washington"; // Wifi network SSID
+const char* password = ""; // Wifi network password
+
+
+String ip = "172.28.219.179"; // Sieg Master IP
+String api_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"; // Sieg Master API Token
 
 //Sieg Lower Floor
 int buttonPins[] = {4, 16, 14, 5, 0, 12, 2, 15, 13};
-int lightIndexes[] = {10, 23, 11, 15, 7, 14, 22, 21, 16};
+int lightIndexes[] = {10, 23, 11, 15, 7, 14, 22, 21, 16}; //Indexes of lights in Philips Hue system
 
 //All possible combinations of 3 lights that result in a victory
 int victoryCombinations[][3] = {{10, 15, 22}, {10, 7, 16}, {10, 23, 11}, {23, 7, 21}, {11, 7, 22}, {11, 14, 16}, {15, 7, 14}, {16, 21, 22}};
@@ -38,79 +46,26 @@ int victoryCombinations[][3] = {{10, 15, 22}, {10, 7, 16}, {10, 23, 11}, {23, 7,
 //2 = player 2
 int tictactoeStates[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-
-//always 1 or 2
-int playerTakingTurn = 1;
+int playerTakingTurn = 1; //always 1 or 2
 
 int buttonToggles[] = {0, 0, 0, 0, 0, 0, 0, 0, 0}; //For debouncing
 
-//timing
-unsigned long currentTime, buttonLastPressTime, lightLastUpdate;
-
-
-
-/*
-   Debugging Print Functions
-   Easier than putting if(DEBUG) in front of every print statement
-*/
-void dbprint(String in) {
-  if (DEBUG) Serial.print(in);
-}
-void dbprintln(String in) {
-  if (DEBUG) Serial.println(in);
-}
-
-
-//Push parameters to group
-void changeGroup(byte groupNum, byte transitiontime, String parameter, String newValue, String parameter2 = "",
-                 String newValue2 = "", String parameter3 = "", String newValue3 = "",
-                 String parameter4 = "", String newValue4 = "");
-
-
-//Push parameters to individual light
-void changeLight(byte lightNum, byte transitiontime, String parameter, String newValue, String parameter2 = "",
-                 String newValue2 = "", String parameter3 = "", String newValue3 = "",
-                 String parameter4 = "", String newValue4 = "");
-
-
-/*  checkLightStatus
-    returns true or false (1 or 0)
-    checks if light is on or off
-    parameter: # of light
-*/
-bool checkLightStatus(byte lightNum);
-
-
-/*  toggleLight
-    Simply toggle the on/off status of a light
-    transitiontime must be specified
-    parameter: # of light
-*/
-void toggleLight(byte lightNum, byte transitiontime) {
-  bool newStatus = !checkLightStatus(lightNum);
-  changeLight(lightNum, transitiontime, "on", newStatus ? "true" : "false");
-}
-
-
-
+unsigned long currentTime, buttonLastPressTime, lightLastUpdate; //timing
 
 /*  setup
     Initialie button pins and serial communication and connect to WiFi
 */
 void setup() {
   Serial.begin(115200);
-  WiFi.begin(ssid, password);
+
   for (int pin : buttonPins) {
     if (pin == 15 or pin == 16) pinMode(pin, INPUT);
     else pinMode(pin, INPUT_PULLUP);
   }
+
   if (!TEXT_TESTING_MODE) {
-    dbprint("Connecting to WiFi");
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(1000);
-      dbprint(".");
-    }
-    dbprintln("Connected to the WiFi network");
+    setup_wifi();
+    client.setServer(mqtt_server, mqtt_port);
   }
   buttonLastPressTime = 0;
   drawLights();
@@ -121,6 +76,23 @@ void setup() {
     check buttons and run tic tac toe game
 */
 void loop() {
+
+
+  if (!TEXT_TESTING_MODE) {
+    //Connect to MQTT if not connected
+    if (!client.connected()) {
+      reconnect();
+    }
+    //Reconnect to WiFi if disconnected
+    if (WiFi.status() != WL_CONNECTED) {
+      delay(1);
+      Serial.print("WIFI Disconnected. Attempting reconnection.");
+      setup_wifi();
+      return; //End this loop cycle if WiFi disconnected
+    }
+  }
+
+
   currentTime = millis(); //Update time (for debouncing)
 
   unsigned long timeSinceLastInput = currentTime - buttonLastPressTime;
@@ -128,12 +100,13 @@ void loop() {
   if (timeSinceLastInput > 15000 and timeSinceLastInput < 15100) {
     dbprintln("15 seconds since last input");
   }
-  
+
   //Reset after 30 seconds of no input
   if (timeSinceLastInput > 30000) {
     dbprintln("Timeout - resetting game");
     buttonLastPressTime = currentTime;
     resetGame();
+
   }
 
   checkButtons(); //Check buttons and trigger actions
@@ -180,6 +153,10 @@ void checkButtons() {
     //If it is pushed,
     //500ms pause, using buttonToggles for debouncing
     if (reading == LOW and buttonToggles[i] == 0 and currentTime - buttonLastPressTime > 500) {
+
+      //MQTT - SEND STATE 1 (ON)
+      sendState(1);
+
       dbprintln("Button " + String(i) + " pressed.");
       tttManager(lightIndexes[i]);
       drawLights();
@@ -209,7 +186,7 @@ void tttManager(int lightNum) {
     //If player 1 or 2 already owns the light, we don't need to do anything
     //Could provide some indication that it was not a valid move
     if (lightOwner == 1 or lightOwner == 2) {
-
+      //Flash led strip red
     }
   }
   else if (playerTakingTurn == 2) {//If player 2 pressed the button
@@ -266,9 +243,21 @@ void checkForVictory() {
       if (owner == 2) greenPlayerCount++;
     }
     if (bluePlayerCount == 3) {
-      changeGroup(1, 2, "on", "true", "bri", "254", "hue", "44000", "sat", "200");
+      changeGroup(1, 2, "on", "true", "bri", "20", "hue", "9000", "sat", "100"); // All lights dim
+      for (int lightNum : victoryCombinations[i]) {
+        changeLight(lightNum, 2, "on", "true", "bri", "150", "hue", "44000", "sat", "200");
+      }
+      delay(100);
+      for (int j = 0; j < 10; j++) {
+        for (int lightNum : victoryCombinations[i]) {
+          changeLight(lightNum, 2, "on", "true", "bri", "254", "hue", "44000", "sat", "200");
+          delay(200);
+          changeLight(lightNum, 2, "on", "true", "bri", "150", "hue", "44000", "sat", "200");
+        }
+      }
+      //changeGroup(1, 2, "on", "true", "bri", "254", "hue", "44000", "sat", "200");
       dbprintln("BLUE (1) WIN");
-      delay(5000);
+      //delay(5000);
       resetGame();
       //blue player WIN
     }
@@ -311,6 +300,7 @@ int ownsLight(int lightNum) {
   }
 }
 
+
 /* lightNumToIndex
    Convert the number of a light in the Philips Hue system
    to it's index in the tic tac toe game (0-8)
@@ -330,7 +320,10 @@ void resetGame() {
   for (int i = 0; i < 9; i++) {
     tictactoeStates[i] = 0;
   }
-  changeGroup(1, 2, "on", "true", "bri", "100", "hue", "9000", "sat", "100");
+  changeGroup(1, 2, "on", "true", "bri", "100", "hue", "9000", "sat", "100"); //Reset to default color
+
+  //MQTT - SEND STATE 0 (OFF)
+  sendState(0);
 }
 
 /* printGameState
@@ -344,4 +337,26 @@ void printGameState() {
   Serial.println(String(tictactoeStates[0]) + "  " + String(tictactoeStates[1]) + "  " + String(tictactoeStates[2]));
   Serial.println(String(tictactoeStates[3]) + "  " + String(tictactoeStates[4]) + "  " + String(tictactoeStates[5]));
   Serial.println(String(tictactoeStates[6]) + "  " + String(tictactoeStates[7]) + "  " + String(tictactoeStates[8]));
+}
+
+
+void setup_wifi() {
+  WiFi.begin(ssid, password);
+  dbprint("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    dbprint(".");
+  }
+  dbprintln("Connected to the WiFi network");
+}
+
+/*
+   Debugging Print Functions
+   Easier than putting if(DEBUG) in front of every print statement
+*/
+void dbprint(String in) {
+  if (DEBUG) Serial.print(in);
+}
+void dbprintln(String in) {
+  if (DEBUG) Serial.println(in);
 }

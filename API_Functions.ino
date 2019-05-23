@@ -1,6 +1,40 @@
 /*
-    Tab 2 - Hue API Funcion bodies
+    Tab 2 - Hue API Funcion headers and bodies
 */
+
+//Push parameters to group
+void changeGroup(byte groupNum, byte transitiontime, String parameter, String newValue, String parameter2 = "",
+                 String newValue2 = "", String parameter3 = "", String newValue3 = "",
+                 String parameter4 = "", String newValue4 = "");
+
+
+//Push parameters to individual light
+void changeLight(byte lightNum, byte transitiontime, String parameter, String newValue, String parameter2 = "",
+                 String newValue2 = "", String parameter3 = "", String newValue3 = "",
+                 String parameter4 = "", String newValue4 = "");
+
+
+/*  checkLightStatus
+    returns true or false (1 or 0)
+    checks if light is on or off
+    parameter: # of light
+*/
+bool checkLightStatus(byte lightNum);
+
+
+/*  toggleLight
+    Simply toggle the on/off status of a light
+    transitiontime must be specified
+    parameter: # of light
+*/
+void toggleLight(byte lightNum, byte transitiontime) {
+  bool newStatus = !checkLightStatus(lightNum);
+  changeLight(lightNum, transitiontime, "on", newStatus ? "true" : "false");
+}
+
+
+
+
 
 void changeGroup(byte groupNum, byte transitiontime, String parameter, String newValue, String parameter2,
                  String newValue2, String parameter3, String newValue3,

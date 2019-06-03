@@ -35,7 +35,7 @@ String ip = "172.28.219.179"; // Sieg Master IP
 String api_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"; // Sieg Master API Token
 
 //Sieg Lower Floor
-int buttonPins[] = {4, 16, 14, 5, 0, 12, 2, 15, 13};
+int buttonPins[] = {14, 12, 13, 15, 0, 16, 2, 5, 4};
 int lightIndexes[] = {10, 23, 11, 15, 7, 14, 22, 21, 16}; //Indexes of lights in Philips Hue system
 
 //All possible combinations of 3 lights that result in a victory
@@ -59,7 +59,7 @@ void setup() {
   Serial.begin(115200);
 
   for (int pin : buttonPins) {
-    if (pin == 15 or pin == 16) pinMode(pin, INPUT);
+    if (pin == 0 or pin == 16 or pin == 14 or pin == 13 or pin == 12) pinMode(pin, INPUT);
     else pinMode(pin, INPUT_PULLUP);
   }
 
@@ -262,9 +262,21 @@ void checkForVictory() {
       //blue player WIN
     }
     if (greenPlayerCount == 3) {
-      dbprintln("GREEN (2) WIN");
-      changeGroup(1, 2, "on", "true", "bri", "254", "hue", "24000", "sat", "200");
-      delay(5000);
+      changeGroup(1, 2, "on", "true", "bri", "20", "hue", "9000", "sat", "100"); // All lights dim
+      for (int lightNum : victoryCombinations[i]) {
+        changeLight(lightNum, 2, "on", "true", "bri", "150", "hue", "24000", "sat", "200");
+      }
+      delay(100);
+      for (int j = 0; j < 10; j++) {
+        for (int lightNum : victoryCombinations[i]) {
+          changeLight(lightNum, 2, "on", "true", "bri", "254", "hue", "24000", "sat", "200");
+          delay(200);
+          changeLight(lightNum, 2, "on", "true", "bri", "150", "hue", "24000", "sat", "200");
+        }
+      }
+      //changeGroup(1, 2, "on", "true", "bri", "254", "hue", "24000", "sat", "200");   
+      dbprintln("GREEN (2) WIN");         
+      //delay(5000);
       resetGame();
       //green player WIN
     }

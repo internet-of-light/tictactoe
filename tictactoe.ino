@@ -23,8 +23,6 @@ const char* mqtt_password = "";
 const int mqtt_port = 1883;
 #define DEVICE_MQTT_NAME "tictactoeHCDEIOL"
 
-bool isRunning = false; //Send status to MQTT
-
 
 WiFiClient espClient;
 PubSubClient client(mqtt_server, mqtt_port, espClient);
@@ -32,7 +30,7 @@ PubSubClient client(mqtt_server, mqtt_port, espClient);
 const char* ssid = "University of Washington"; // Wifi network SSID
 const char* password = ""; // Wifi network password
 
-
+bool GAME_RUNNING = false;
 String ip = "172.28.219.179"; // Sieg Master IP
 String api_token = "rARKEpLebwXuW01cNVvQbnDEkd2bd56Nj-hpTETB"; // Sieg Master API Token
 
@@ -98,7 +96,7 @@ void loop() {
 
   unsigned long timeSinceLastInput = currentTime - buttonLastPressTime;
   //Warning after 15 seconds
-  if (timeSinceLastInput > 15000 and timeSinceLastInput < 15100) {
+  if (timeSinceLastInput > 15000 and timeSinceLastInput < 15050) {
     dbprintln("15 seconds since last input");
   }
 
@@ -154,9 +152,10 @@ void checkButtons() {
     //If it is pushed,
     //500ms pause, using buttonToggles for debouncing
     if (reading == LOW and buttonToggles[i] == 0 and currentTime - buttonLastPressTime > 500) {
-
+  
       //MQTT - SEND STATE 1 (ON)
       sendState(1);
+      GAME_RUNNING = true;
 
       dbprintln("Button " + String(i) + " pressed.");
       tttManager(lightIndexes[i]);
@@ -333,8 +332,8 @@ void resetGame() {
   for (int i = 0; i < 9; i++) {
     tictactoeStates[i] = 0;
   }
-  changeGroup(1, 2, "on", "true", "bri", "100", "hue", "9000", "sat", "100"); //Reset to default color
-
+  if(GAME_RUNNING) changeGroup(1, 2, "on", "true", "bri", "100", "hue", "9000", "sat", "100"); //Reset to default color
+  GAME_RUNNING = false;
   //MQTT - SEND STATE 0 (OFF)
   sendState(0);
 }

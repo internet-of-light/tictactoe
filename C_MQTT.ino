@@ -3,7 +3,7 @@ void reconnect() {
   while (!client.connected()) { // Loop until we're reconnected
     dbprintln("Attempting MQTT connection...");
     if (client.connect(DEVICE_MQTT_NAME, mqtt_username, mqtt_password)) {  // Attempt to connect
-      dbprintln("MQTT onnected");
+      dbprintln("MQTT connected");
       //client.subscribe(subscribe_top); //Does ttt need to sub to anything?
       //sendState(0);
     } else {
@@ -16,22 +16,15 @@ void reconnect() {
   }
 }
 
-#define MQTT_TOPIC "hcdeiot"
+#define MQTT_TOPIC "hcdeiol"
 
 //Send MQTT status update
 void sendState(bool tttActive) {
   StaticJsonBuffer<512> jsonBuffer;
 
   JsonObject& root = jsonBuffer.createObject();
-
-  root["tictactoe"] = tttActive;
-//  JsonObject& color = root.createNestedObject("color");
-//  color["r"] = red;
-//  color["g"] = green;
-//  color["b"] = blue;
-//
-//  root["brightness"] = brightness;
-//  root["effect"] = effectString.c_str();
+  String onOff = tttActive? "on" : "off";
+  root["tictactoe"] = onOff;
 
 
   char buffer[root.measureLength() + 1];

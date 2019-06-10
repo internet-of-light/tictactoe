@@ -17,15 +17,17 @@
 #define DEBUG true //View button presses and Hue API calls in serial monitor
 
 //MQTT
-const char* mqtt_server = "broker.mqttdashboard.com";
+const char* mqtt_server = "test.mosquitto.org";
 const char* mqtt_username = "";
 const char* mqtt_password = "";
 const int mqtt_port = 1883;
-#define DEVICE_MQTT_NAME "tictactoe"
+#define DEVICE_MQTT_NAME "tictactoeHCDEIOL"
+
+bool isRunning = false; //Send status to MQTT
 
 
 WiFiClient espClient;
-PubSubClient client(espClient);
+PubSubClient client(mqtt_server, mqtt_port, espClient);
 
 const char* ssid = "University of Washington"; // Wifi network SSID
 const char* password = ""; // Wifi network password
@@ -65,7 +67,6 @@ void setup() {
 
   if (!TEXT_TESTING_MODE) {
     setup_wifi();
-    client.setServer(mqtt_server, mqtt_port);
   }
   buttonLastPressTime = 0;
   drawLights();
